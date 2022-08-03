@@ -1,16 +1,16 @@
 # gusto_adversity_microbiome_SEF
 Analysis scripts used for the manuscript "Multigenerational adversity impacts on gut microbiome composition and socioemotional functioning in early childhood"
 
-To open the .html files:
+## To open the .html files: ##
 1. Click on file, then click "Download". This will open the raw version of the file. 
 2. Right click on this page of text and hit "Save as..."
 3. Download and save as .txt file
 4. Change extension from .txt to .html
 5. Click to open in a web browser
 
-The following scripts are included in this repository:
-1. Main analysis script: gusto_microbioM24_adversity_cbcl_sharingversion.html
-2. Questionnaire data cleaning scripts:
+## The following scripts are included in this repository: ##
+__Main analysis script:__ gusto_microbioM24_adversity_cbcl_sharingversion.html
+__Questionnaire data cleaning scripts:__
   1. gusto_age_cleaning.html
   2. gusto_biotics_cleaning.html
   3. gusto_breastfeeding_cleaning.html
@@ -21,4 +21,4 @@ The following scripts are included in this repository:
   8. gusto_income_household_cleaning.html
   9. gusto_leq_scoring.html
   10. gusto_stai_scoring_sharing.html
-3. Microbiome data processing script: gusto_M24_M48_microbiota_processing.html
+__Microbiome data processing script:__ gusto_M24_M48_microbiota_processing.html

@@ -4,4 +4,4 @@ Analysis scripts used for the manuscript "Multigenerational adversity impacts on
 To open the .html files:
 1. Download and save as .txt
 2. Change extension from .txt to .html
-3. Click to open in a web browers
+3. Click to open in a web browser

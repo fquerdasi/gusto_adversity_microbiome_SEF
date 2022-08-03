@@ -7,3 +7,18 @@ To open the .html files:
 3. Download and save as .txt file
 4. Change extension from .txt to .html
 5. Click to open in a web browser
+
+The following scripts are included in this repository:
+1. Main analysis script: gusto_microbioM24_adversity_cbcl_sharingversion.html
+2. Questionnaire data cleaning scripts:
+  1. gusto_age_cleaning.html
+  2. gusto_biotics_cleaning.html
+  3. gusto_breastfeeding_cleaning.html
+  4. gusto_cbcl_fran_sharingversion.html
+  5. guto_cbcl_gi_scoring_sharing.html
+  6. gusto_ctq_scoring_sharingversion.html
+  7. gusto_deliverymode_scoring.html
+  8. gusto_income_household_cleaning.html
+  9. gusto_leq_scoring.html
+  10. gusto_stai_scoring_sharing.html
+3. Microbiome data processing script: gusto_M24_M48_microbiota_processing.html

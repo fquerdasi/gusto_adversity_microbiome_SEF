@@ -9,7 +9,8 @@ Analysis scripts used for the manuscript "Multigenerational adversity impacts on
 5. Click to open in a web browser
 
 ## The following scripts are included in this repository: ##
-__Main analysis script:__ gusto_microbioM24_adversity_cbcl_sharingversion.html
+__Main analysis script:__ gusto_microbioM24_adversity_cbcl_sharingversion.html.  
+
 __Questionnaire data cleaning scripts:__
   1. gusto_age_cleaning.html
   2. gusto_biotics_cleaning.html
@@ -21,4 +22,5 @@ __Questionnaire data cleaning scripts:__
   8. gusto_income_household_cleaning.html
   9. gusto_leq_scoring.html
   10. gusto_stai_scoring_sharing.html
-__Microbiome data processing script:__ gusto_M24_M48_microbiota_processing.html
+
+__Microbiome data processing script:__ gusto_M24_M48_microbiota_processing.html.  

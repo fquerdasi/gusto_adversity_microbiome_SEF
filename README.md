@@ -1,5 +1,5 @@
 # gusto_adversity_microbiome_SEF
-Analysis scripts used for the manuscript "Multigenerational adversity impacts on gut microbiome composition and socioemotional functioning in early childhood". 
+Data processing and analysis scripts used for the manuscript "Multigenerational adversity impacts on gut microbiome composition and socioemotional functioning in early childhood". 
 
 Preprint at: https://psyarxiv.com/64m9g/, OSF project at: https://osf.io/c564x/. 
 

@@ -3,6 +3,8 @@ Data processing and analysis scripts used for the manuscript "Multigenerational 
 
 Preprint at: https://psyarxiv.com/64m9g/, OSF project at: https://osf.io/c564x/. 
 
+These scripts are uploaded as .html files knitted from R markdown or Jupyter notebook (depending on coding language) so that code and output can be easily viewed together. However, the .html files cannot be visualized directly within GitHub. Please follow the instructions below to open and view them. 
+
 ## To open the .html files: ##
 1. Click on file, then click "Download". This will open the raw version of the file. 
 2. Right click on this page of text and hit "Save as..."

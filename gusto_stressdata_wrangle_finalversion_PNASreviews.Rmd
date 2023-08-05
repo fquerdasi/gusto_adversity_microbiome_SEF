@@ -1,0 +1,190 @@
+---
+title: "gusto_stress_data_wrangle"
+author: "Fran Querdasi"
+date: "4/30/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Setup
+## load libraries
+```{r}
+library(tidyverse)
+library(compareDF)
+```
+
+# Data Wrangling
+## Read in microbiome metadata files
+```{r}
+#read in metadata files
+long_m_file <- "../../data/microbiome/GUSTO_106subjects_16Sdata_longitudinal/original_files/Sample_IDs.txt"
+cs_m_file <- "../../data/microbiome/M24_M48/original_files/SampleID_mapping.txt"
+
+long_meta <-
+  read_tsv(long_m_file)
+
+cs_metadata <-
+  read_tsv(cs_m_file)
+```
+## Join the cross-sectional and longitudinal microbiome M24 datasets' metadata together
+```{r}
+#rename gusto ID variable in cross-sectional metadata to be same as longitudinal metadata
+cs_metadata <-
+  cs_metadata %>% 
+  dplyr::rename(GUSTO_id = GUSTOid, '#SampleID' = '#Sample_ID')
+
+#create datasets with just 24 month samples for both cross-sectional and longitudinal 
+cs_metadata_24 <-
+  cs_metadata %>% 
+  filter(Timepoint_months == 24) %>% 
+  dplyr::select(-Sequencing_batch)
+
+long_metadata_24 <-
+  long_meta %>% 
+  filter(Timepoint_months == 24)
+
+#join cross-sectional and longitudinal 24M samples
+metadata_24 <-
+  cs_metadata_24 %>% 
+  full_join(long_metadata_24, by = "GUSTO_id")
+```
+
+## Create datasets with each adversity exposure data and M24, M48 metadata
+```{r}
+#read in adversity data
+postnatal_stress_file <- "../../data/stress/GUSTO_child_stress_Y4_20210528.csv"
+
+ctq_file <- "../../data/mother_childhood/GUSTO_M54_CTQ_scores_revised_20230109.csv"
+
+stai_file <- "../../data/mh_trajectories/GUSTO_BDISTAI_imputed_scores_20210507.csv"
+
+postnatal_dat <-
+  read_csv(postnatal_stress_file)
+
+ctq_dat <-
+  read_csv(ctq_file)
+
+stai_dat <-
+  read_csv(stai_file)
+
+#select variables of interest for each adversity exposure 
+#prenatal 
+stai_ids <-
+  stai_dat %>% 
+  filter(!is.na(STAI_prorated_state_pw26)) %>% 
+  dplyr::select(subjid, STAI_prorated_state_pw26)
+
+#preconception
+ctq_ids <-
+  ctq_dat %>% 
+  filter(!is.na(ctq_total_score_25it)) #only take samples with data
+
+#postnatal
+postnatal_ids <-
+  postnatal_dat %>% 
+  dplyr::select(
+    subjid,
+    les_child_neg_events_total_Y04,
+    leq_neg_events_total_Y04,
+    leq_b2_events_total_Y04,
+    leq_b2_neg_events_total_Y04,
+    child_neg_events_sum
+  )
+
+#select samples from microbiome metadata that were collected at M24
+mb_ids_M24 <-
+  metadata_24 %>% 
+  mutate(timepoint = 24) %>% 
+  dplyr::select(GUSTO_id, timepoint) %>% 
+  dplyr::rename(subjid=GUSTO_id)
+
+#select samples form microbiome metadata that were collected at M48
+mb_ids_M48 <-
+  cs_metadata %>% 
+  mutate(timepoint=48) %>% 
+  filter(Timepoint_months == 48) %>% 
+  dplyr::select(GUSTO_id, timepoint) %>% 
+  dplyr::rename(subjid=GUSTO_id)
+```
+
+## Merge 24M microbimoe metadata and adversity data
+```{r}
+M24_all <-
+  postnatal_ids %>% 
+  full_join(mb_ids_M24, by = "subjid") %>% 
+  full_join(stai_ids, by = "subjid") %>% 
+  full_join(ctq_ids, by = "subjid")
+```
+
+## Merge M48 microbimoe metadata and adversity data
+```{r}
+M48_all <-
+  postnatal_ids %>% 
+  full_join(mb_ids_M48, by = "subjid") %>% 
+  full_join(stai_ids, by = "subjid") %>% 
+  full_join(ctq_ids, by = "subjid")
+```
+
+## Add ethnicity variable
+```{r}
+#read in BDI file -- contains mom ethnicity
+bdi_orig_f <- "../../data/pregnancy_mh/STAI_BDI_FormA515_20201218.xlsx"
+
+mom_ethn <-
+  readxl::read_xlsx(bdi_orig_f)
+
+#select mom ethnicity values
+mom_ethn <-
+  mom_ethn %>% 
+  dplyr::select(
+    subjid=SubjectID,
+    mother_ethnicity
+  ) 
+
+M24_all <-
+  M24_all %>% 
+  left_join(mom_ethn, by = "subjid")
+
+M48_all <-
+  M48_all %>% 
+  left_join(mom_ethn, by = "subjid")
+```
+
+
+## Generate datasets combining continuous adversity data, microbiome metadata, and ethnicity 
+```{r}
+#filter for IDs that have microbiome data
+M24_mb <-
+  M24_all %>% 
+  filter(!is.na(timepoint))
+
+M48_mb <-
+  M48_all %>% 
+  filter(!is.na(timepoint))
+
+#create #SampleID variable for merging with alpha diversity data
+M24_mb <-
+  M24_mb %>%
+  mutate(month = "M") %>% 
+  unite('#SampleID_p', subjid, timepoint, sep= "-", remove=FALSE) %>% 
+  unite('#SampleID', '#SampleID_p', month, sep= "", remove=TRUE)
+
+M48_mb <-
+  M48_mb %>%
+  mutate(month = "M") %>% 
+  unite('#SampleID_p', subjid, timepoint, sep= "-", remove=FALSE) %>% 
+  unite('#SampleID', '#SampleID_p', month, sep= "", remove=TRUE)
+```
+
+# Write datasets for use in main analysis script
+```{r}
+M24_output_path <- "../../data/analysis_datasets/fran/gusto_M24cs_stress_data_ctqrev.csv"
+M48_output_path <- "../../data/analysis_datasets/fran/gusto_M48_stress_data.csv"
+
+write_csv(M24_mb, M24_output_path)
+write_csv(M48_mb, M48_output_path)
+```
+

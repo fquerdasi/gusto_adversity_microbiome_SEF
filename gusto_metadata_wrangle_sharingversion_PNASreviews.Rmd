@@ -1,0 +1,256 @@
+---
+title: "gusto_metadata_wrangle"
+author: "Fran Querdasi"
+date: "5/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Setup
+## Load libraries
+```{r, message=FALSE}
+library(tidyverse)
+```
+
+## Import data
+**Note:** Filepaths (this chunk) are not shown
+```{r, echo=FALSE, message=FALSE}
+#filepaths 
+postnatal_stress_file <- "../../data/stress/GUSTO_child_stress_Y4_20210528.csv"
+prenatal_stress_file <- "../../data/mh_trajectories/GUSTO_BDISTAI_imputed_scores_20210507.csv"
+mom_childhood_stress_file <- "../../data/mother_childhood/GUSTO_M54_CTQ_scores_revised_20230109.csv"
+ethnicity_file <- "../../data/pregnancy_mh/STAI_BDI_FormA515_20201218.xlsx"
+infant_sex_file <- "../../data/general_covariates/infant_sex.xlsx"
+metadata_file <- "../../data/microbiome/M24_M48/original_files/SampleID_mapping.txt"
+income_file <- "../../data/general_covariates/GUSTO_income_clean_20210702.csv"
+delivery_mode_file <- "../../data/mb_covariates/GUSTO_deliverymode_cleaned_20210623.csv"
+breastfeeding_file <- "../../data/mb_covariates/GUSTO_breastfeeding_clean_20210623.csv"
+biotics_file <- "../../data/mb_covariates/GUSTO_M24_biotics_clean_20220218.csv"
+gestage_file <- "../../data/general_covariates/GA_weight_Ages_at_measures_FormA515_20210719.xlsx"
+cbcl_age2_file <- "../../data/child_beh/GUSTO_CBCL_scores_M24_20220516.csv"
+cbcl_age4_file <- "../../data/child_beh/GUSTO_CBCL_scores_Y04_20220516.csv"
+age_file <- "../../data/general_covariates/GUSTO_age_stoolproxy_20220615.csv"
+diet_file <- "../../data/mb_covariates/diet_covariates.csv"
+dqi_file <- "../../data/mb_covariates/dqi_variety_scores.csv"
+
+
+#read in dataframes
+post_stress <-
+  read_csv(postnatal_stress_file)  ##fran this doesn't work for me
+
+pre_stress <-
+  read_csv(prenatal_stress_file) %>% 
+  dplyr::select(
+    subjid,
+    STAI_prorated_state_pw26,
+    stai_state_above_clin_cutoff_pw26
+  )
+
+m_ch_stress <-
+  read_csv(mom_childhood_stress_file) %>% 
+  dplyr::select(
+    subjid,
+    maltreated_mod_rev,
+    contains("score")
+  )
+
+ethnicity <-
+  readxl::read_xlsx(ethnicity_file) %>% 
+  dplyr::select(
+    subjid = SubjectID,
+    mother_ethnicity
+  )
+
+sex <-
+  readxl::read_xlsx(infant_sex_file) %>% 
+  dplyr::rename(subjid=SubjectID) #0 = female, 1 = male
+
+metadata <-
+  read_tsv(metadata_file) %>% 
+  dplyr::rename(
+    '#SampleID' = '#Sample_ID',
+    subjid=GUSTOid) #rename ID variable for joining with other data
+
+income <-read_csv(income_file)
+
+deliv_mode <-read_csv(delivery_mode_file)
+
+bf <-read_csv(breastfeeding_file)
+
+biotics <- read_csv(biotics_file)
+
+gest_age <- readxl::read_xlsx(gestage_file) %>% 
+  dplyr::select(
+    subjid = SubjectID,
+    GA
+  )
+
+beh2 <- read_csv(cbcl_age2_file) %>% 
+  dplyr::select( #select only cbcl age 2 years variables that we will be examining 
+    subjid,
+    age_m24_cbcl = age_m24,
+    cbcl_mom_fill_m24,
+    cbclintprobtot_m24,
+    cbcltotprobtot_m24,
+    cbcldevprobtot_m24
+  )
+
+beh4 <- read_csv(cbcl_age4_file) %>% 
+  dplyr::select( #select only cbcl age 4 years variables that we will be examining 
+    subjid,
+    age_y4_cbcl = age_y4,
+    cbcl_mom_fill_y4,
+    cbclintprobtot_y4,
+    cbcltotprobtot_y4,
+    cbcladhdprobtot_y4,
+    cbclattprobtot_y4,
+    cbclextprobtot_y4,
+    cbclsleepprobtot_y4,
+    cbcldevprobtot_y4
+  )
+
+diet <- read_csv(diet_file)
+
+dqi_variety <- read_csv(dqi_file) %>% 
+  dplyr::select(
+    subjid,
+    total_variety,
+    foodgroup_variety,
+    protein_variety
+  )
+
+dqi_variety$subjid <- str_sub(dqi_variety$subjid, end=9)
+```
+# Merge metadata
+```{r, message=FALSE}
+metadata_complete <- #only include metadata for IDs that have gut microbiome data, so left_join everything to gm metadata file
+  metadata %>% 
+  left_join(
+    ethnicity, by = "subjid"
+  ) %>% 
+  left_join(
+    sex, by = "subjid"
+  ) %>% 
+  left_join(
+    m_ch_stress, by = "subjid"
+  ) %>% 
+  left_join(
+    pre_stress, by = "subjid"
+  ) %>% 
+  left_join(
+    post_stress, by = "subjid"
+  ) %>% 
+  left_join(
+    income, by = "subjid"
+  ) %>% 
+  left_join(
+    deliv_mode, by = "subjid"
+  ) %>% 
+  left_join(
+    bf, by = "subjid"
+  ) %>% 
+  left_join(
+    biotics, by = "subjid"
+  ) %>% 
+  left_join(
+    gest_age, by = "subjid"
+  ) %>% 
+  left_join(
+    beh2, by = "subjid"
+  ) %>% 
+  left_join(
+    beh4, by = "subjid"
+  ) %>% 
+  left_join(
+    read_csv(age_file), by = "subjid"
+  ) %>% 
+  left_join(
+    diet, by = "subjid"
+  ) %>% 
+  left_join(
+    dqi_variety, by = "subjid"
+  )
+
+```
+
+# Clean up & add new variables
+```{r}
+metadata_final <- 
+  metadata_complete %>% 
+  dplyr::select(
+    -person_filling_Y04, #not necssary to include, because it is "mother" for all who answered
+    -leq_neg_events_total_Y04, #remove LEQ variables that are not being used
+    -les_child_neg_events_total_Y04,
+    -c_age_years_stoolproxy_y4,
+    -contains("days")
+  ) %>% 
+  mutate(
+    postnatal_stress = case_when( #NOTE that postnatal_stress var definition is DIFFERENT for 24M and 48M 
+      Timepoint_months == 48 & child_neg_events_sum > 0 ~ 1, #postnatal_stress is 1 for M48 if any negative events endorsed on LEQ or any child events endorsed on LES
+      Timepoint_months == 48 & child_neg_events_sum == 0 ~ 0,
+      Timepoint_months == 24 & leq_b2_events_total_Y04 > 0 ~ 1, #postnatal_stress is 1 for M24 if any events endorsed before age 2 years
+      Timepoint_months == 24 & leq_b2_events_total_Y04 == 0 ~ 0
+    )
+  ) %>% 
+  dplyr::select(
+    -child_neg_events_sum, #remove variable no longer needed after calculation
+    -leq_b2_events_total_Y04,
+    -leq_b2_neg_events_total_Y04
+  ) %>% 
+  mutate( #create cumulative adversity variable
+     postnatal_stress = as.numeric(as.character(postnatal_stress)),
+     sum_advrsty = maltreated_mod_rev + stai_state_above_clin_cutoff_pw26 + postnatal_stress,
+     cumulative_adv = case_when(
+      sum_advrsty == 0 ~ 0,
+      sum_advrsty == 1 ~ 1,
+      sum_advrsty == 2 | sum_advrsty == 3 ~ 2
+    )
+  )
+
+#create M24 metadata file, standardize cbcl scores within sex 
+ metadata_M24 <-
+  metadata_final %>% 
+  dplyr::filter(Timepoint_months==24) %>% 
+  group_by(sex_binary) %>% 
+  dplyr::mutate(across(contains("tot_"), .fns = list(std = ~as.numeric(scale(.))*15 + 100), .names="{col}_{fn}")) %>% 
+  ungroup()
+
+#remove unused cbcl variables  
+metadata_M24 <- metadata_M24 %>% 
+  dplyr::select(-(!contains("_std") & contains("tot_")))
+
+#create separate dataframe for M48 metadata
+metadata_Y4 <-
+  metadata_final %>% 
+  filter(Timepoint_months ==48)
+```
+
+# Write metadata file
+## Write intial metadata file 
+```{r}
+metadata_output_path <- "../../data/microbiome/M24_M48/input_files/M24_metadata_typeheader1_rev_dqi.tsv"
+
+write_tsv(metadata_M24, metadata_output_path)
+```
+
+## Manually add typeheader to metadata file
+This is necessary for reading the metadata file into phyloseq (otherwise it will not recognize the file as metadata)  
+
+1. Open metadata .tsv in Excel
+2. Add row at top with #q2:types under the #SampleID column, and then for each column write either "categorical" or "numeric" depending on data type
+3. Save as .txt
+
+## Convert manually edited metadata file (typeheader added) to .tsv
+```{r}
+test_file <- "../../data/microbiome/M24_M48/input_files/M24_metadata_typeheader1_rev_dqi.txt"
+
+test <- read_tsv(test_file)
+
+write_tsv(test, "../../data/microbiome/M24_M48/input_files/M24_metadata_typeheader_new_rev_dqi.tsv")
+```
+
+
+

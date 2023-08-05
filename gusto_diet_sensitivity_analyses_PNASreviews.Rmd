@@ -1,0 +1,932 @@
+---
+title: "gusto_diet_sensitivity_analyses"
+author: "Fran Querdasi"
+date: "2023-03-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Setup
+## Load libraries
+```{r}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(readxl)
+  library(stats)
+  library(sjPlot)
+  library(ppcor)
+  library(qiime2R)
+  library(phyloseq)
+  library(vegan)
+  source("../helper_functions/omega_sq_adonis.R")
+  library(Maaslin2)
+})
+
+```
+
+## Load data
+```{r}
+# load dqi custom score data
+dqi_data <- read_csv("../../data/mb_covariates/dqi_variety_scores.csv")
+
+# load other variables
+alpha_diversity_stress_usable <- read_csv("../../data/analysis_datasets/fran/alpha_div_stress_usable_ctqrev.csv") 
+```
+
+# Examine ethnicity group differences in diet variables
+Diet variables: total_variety, protein variety, food group variety
+## Full sample
+```{r}
+# remove the extra "-010" at the end of the DQI subjid variable
+dqi_data$subjid <- str_sub(dqi_data$subjid, end=9)
+
+# merge diet variables with rest of variables
+alpha_diversity_stress_usable_dietvar <- alpha_diversity_stress_usable %>% 
+  left_join(dqi_data, by = "subjid")
+
+# ANOVAs for total variety, protein variety, food group variety
+summary(aov(total_variety~mother_ethnicity, data=alpha_diversity_stress_usable_dietvar)) #sig
+summary(aov(protein_variety~mother_ethnicity, data=alpha_diversity_stress_usable_dietvar)) #sig
+summary(aov(foodgroup_variety~mother_ethnicity, data=alpha_diversity_stress_usable_dietvar)) #sig
+
+
+# test for significant pairwise comparisons (chinese vs. malay, chinese vs. indian, indian vs. malay), with Bonferroni MC correction
+pairwise.t.test(alpha_diversity_stress_usable_dietvar$total_variety, alpha_diversity_stress_usable_dietvar$mother_ethnicity, p.adjust.method = "BH") #chinese/indian and chinese/malay different
+
+pairwise.t.test(alpha_diversity_stress_usable_dietvar$protein_variety, alpha_diversity_stress_usable_dietvar$mother_ethnicity, p.adjust.method = "BH") #same as above
+
+pairwise.t.test(alpha_diversity_stress_usable_dietvar$foodgroup_variety, alpha_diversity_stress_usable_dietvar$mother_ethnicity, p.adjust.method = "BH") #only chinese/malay different
+
+# determine direction of effects by comparing means
+alpha_diversity_stress_usable_dietvar %>% 
+  group_by(mother_ethnicity) %>% 
+  summarize(total_variety_means = mean(total_variety, na.rm=TRUE),
+            protein_variety_means = mean(protein_variety, na.rm=TRUE),
+            foodgroup_variety_means = mean(foodgroup_variety, na.rm=TRUE))
+
+# general trend: Chinese higher on variety measures
+
+# ANOVAs for DQI.score.adjusted, protein, fat, fiber, etc. 
+summary(aov(DQI.score.adjusted~mother_ethnicity, data=alpha_diversity_stress_usable_dietvar)) #sig
+summary(aov(Fibre.per.1000kcal~mother_ethnicity, data=alpha_diversity_stress_usable_dietvar)) #sig
+summary(aov(`CHO_%energy`~mother_ethnicity, data=alpha_diversity_stress_usable_dietvar)) #ns
+summary(aov(`Protein_%energy`~mother_ethnicity, data=alpha_diversity_stress_usable_dietvar)) #sig
+summary(aov(`Fat_%energy`~mother_ethnicity, data=alpha_diversity_stress_usable_dietvar)) #ns
+summary(aov(SatFat_.~mother_ethnicity, data=alpha_diversity_stress_usable_dietvar)) #ns
+summary(aov(MUFA_. ~mother_ethnicity, data=alpha_diversity_stress_usable_dietvar)) #ns
+summary(aov(PUFA_.~mother_ethnicity, data=alpha_diversity_stress_usable_dietvar)) #ns
+
+# test for significant pairwise comparisons (chinese vs. malay, chinese vs. indian, indian vs. malay), with Bonferroni MC correction
+pairwise.t.test(alpha_diversity_stress_usable_dietvar$DQI.score.adjusted, alpha_diversity_stress_usable_dietvar$mother_ethnicity, p.adjust.method = "BH") 
+
+pairwise.t.test(alpha_diversity_stress_usable_dietvar$Fibre.per.1000kcal, alpha_diversity_stress_usable_dietvar$mother_ethnicity, p.adjust.method = "BH") 
+
+pairwise.t.test(alpha_diversity_stress_usable_dietvar$`Protein_%energy`, alpha_diversity_stress_usable_dietvar$mother_ethnicity, p.adjust.method = "BH") 
+
+# determine direction of effects by comparing means
+alpha_diversity_stress_usable_dietvar %>% 
+  group_by(mother_ethnicity) %>% 
+  summarize(DQI_means = mean(DQI.score.adjusted, na.rm=TRUE),
+            Fiber_means = mean(Fibre.per.1000kcal, na.rm=TRUE),
+            Protein_means = mean(`Protein_%energy`, na.rm=TRUE))
+```
+
+## Analytic sample
+```{r}
+#create complete cases dataset to use for both with and without covariates (to ensure same sample used in comparison)
+alpha_div_all_cov_complete <- #create complete cases dataset for this analysis
+  alpha_diversity_stress_usable_dietvar %>% 
+  filter(!is.na(ctq_total_score_25it) & !is.na(STAI_prorated_state_pw26) & !is.na(postnatal_stress) & !is.na(deliv_mode) & !is.na(sex_binary) &!is.na(monthly_income_per_member) &!is.na(Sequencing_batch) & !is.na(PUFA_.)) 
+
+# ANOVAs for total variety, protein variety, food group variety
+summary(aov(total_variety~mother_ethnicity, data=alpha_div_all_cov_complete)) #sig
+summary(aov(protein_variety~mother_ethnicity, data=alpha_div_all_cov_complete)) #ns
+summary(aov(foodgroup_variety~mother_ethnicity, data=alpha_div_all_cov_complete)) #sig
+summary(aov(DQI.score.adjusted~mother_ethnicity, data=alpha_div_all_cov_complete)) #sig
+
+# test for significant pairwise comparisons (chinese vs. malay, chinese vs. indian, indian vs. malay), with BH mc correction
+pairwise.t.test(alpha_div_all_cov_complete$total_variety, alpha_div_all_cov_complete$mother_ethnicity, p.adjust.method = "BH") #only chinese/malay different
+
+pairwise.t.test(alpha_div_all_cov_complete$foodgroup_variety, alpha_div_all_cov_complete$mother_ethnicity, p.adjust.method = "BH") #ns
+
+pairwise.t.test(alpha_div_all_cov_complete$DQI.score.adjusted, alpha_div_all_cov_complete$mother_ethnicity, p.adjust.method = "BH") #chinese/malay different
+
+# determine direction of effects by comparing means
+alpha_div_all_cov_complete %>% 
+  group_by(mother_ethnicity) %>% 
+  summarize(total_variety_means = mean(total_variety, na.rm=TRUE),
+            foodgroup_variety_means = mean(foodgroup_variety, na.rm=TRUE),
+            dqi_score_means = mean(DQI.score.adjusted, na.rm=TRUE))
+
+# Chinese sig. higher than Malay on total variety
+
+# ANOVAs for ethnic group differences in protein, fat, fiber, etc. 
+summary(aov(Fibre.per.1000kcal~mother_ethnicity, data=alpha_div_all_cov_complete)) #sig
+summary(aov(`CHO_%energy`~mother_ethnicity, data=alpha_div_all_cov_complete)) #sig
+summary(aov(`Protein_%energy`~mother_ethnicity, data=alpha_div_all_cov_complete)) #sig
+summary(aov(`Fat_%energy`~mother_ethnicity, data=alpha_div_all_cov_complete)) #ns
+summary(aov(SatFat_.~mother_ethnicity, data=alpha_div_all_cov_complete)) #ns
+summary(aov(MUFA_. ~mother_ethnicity, data=alpha_div_all_cov_complete)) #ns
+summary(aov(PUFA_.~mother_ethnicity, data=alpha_div_all_cov_complete)) #ns
+
+# test for significant pairwise comparisons (chinese vs. malay, chinese vs. indian, indian vs. malay), with Bonferroni MC correction
+pairwise.t.test(alpha_div_all_cov_complete$Fibre.per.1000kcal, alpha_div_all_cov_complete$mother_ethnicity, p.adjust.method = "BH") 
+
+pairwise.t.test(alpha_div_all_cov_complete$`CHO_%energy`, alpha_div_all_cov_complete$mother_ethnicity, p.adjust.method = "BH") 
+
+pairwise.t.test(alpha_div_all_cov_complete$`Protein_%energy`, alpha_div_all_cov_complete$mother_ethnicity, p.adjust.method = "BH") 
+
+# determine direction of effects by comparing means
+alpha_div_all_cov_complete %>% 
+  group_by(mother_ethnicity) %>% 
+  summarize(CHO_means = mean(`CHO_%energy`, na.rm=TRUE),
+            Fiber_means = mean(Fibre.per.1000kcal, na.rm=TRUE),
+            Protein_means = mean(`Protein_%energy`, na.rm=TRUE))
+
+```
+
+# Examine variety as a covariate to be added
+## Alpha diversity
+```{r}
+# is diet variety associated with alpha diversity?
+cor.test(alpha_div_all_cov_complete$total_variety, alpha_div_all_cov_complete$shannon_entropy) #ns
+cor.test(alpha_div_all_cov_complete$total_variety, alpha_div_all_cov_complete$faith_pd) #ns
+cor.test(alpha_div_all_cov_complete$total_variety, alpha_div_all_cov_complete$pielou_evenness) #ns
+cor.test(alpha_div_all_cov_complete$total_variety, alpha_div_all_cov_complete$observed_features) #ns
+
+cor.test(alpha_div_all_cov_complete$foodgroup_variety, alpha_div_all_cov_complete$shannon_entropy) #ns
+cor.test(alpha_div_all_cov_complete$foodgroup_variety, alpha_div_all_cov_complete$faith_pd) #ns
+cor.test(alpha_div_all_cov_complete$foodgroup_variety, alpha_div_all_cov_complete$pielou_evenness) #ns
+cor.test(alpha_div_all_cov_complete$foodgroup_variety, alpha_div_all_cov_complete$observed_features) #ns
+
+cor.test(alpha_div_all_cov_complete$protein_variety, alpha_div_all_cov_complete$shannon_entropy) #ns
+cor.test(alpha_div_all_cov_complete$protein_variety, alpha_div_all_cov_complete$faith_pd) #ns
+cor.test(alpha_div_all_cov_complete$protein_variety, alpha_div_all_cov_complete$pielou_evenness) #ns
+cor.test(alpha_div_all_cov_complete$protein_variety, alpha_div_all_cov_complete$observed_features) #ns
+
+# verdict: no
+```
+
+## Beta diversity
+```{r}
+# for beta diversity
+general_mb_path <- "../../data/microbiome/M24_M48/"
+otu_table_path <- str_c(general_mb_path, "input_files/M2448_feature-table.qza")
+tree_path <- str_c(general_mb_path, "input_files/M2448_rep_otu-tree.qza")
+taxonomy_path <- str_c(general_mb_path, "input_files/M2448_taxonomy.qza")
+metadata_path <- str_c(general_mb_path, "input_files/M24_metadata_typeheader_new_rev_dqi.tsv")
+
+physeq_M2448_diet <- qza_to_phyloseq(
+  features=otu_table_path,
+  tree=tree_path,
+  taxonomy=taxonomy_path,
+  metadata=metadata_path
+)
+
+sample_variables(physeq_M2448_diet)
+
+#create a phyloseq object containing only 24M samples
+physeq_M24_diet <- subset_samples(physeq_M2448_dqi, Timepoint_months=="24")
+
+physeq_M24_diet <- subset_samples(physeq_M24_diet, !is.na(postnatal_stress) & !is.na(maltreated_mod_rev) & !is.na(stai_state_above_clin_cutoff_pw26) & !is.na(only_bf_months) & !is.na(deliv_mode) & !is.na(mother_ethnicity) & !is.na(antibio_M24) & !is.na(Sequencing_batch) & !is.na(PUFA_.))
+
+# is total diet variety associated with beta diversity?
+physeq_M24_totalvar <- subset_samples(physeq_M24_diet, !is.na(total_variety)) #create a dataset that is complete on total vareity; necessary for distance matrix calculations to work
+
+#get distance matrices (weighted unifrac, unweighted unifrac, bray-curtis, jaccard)
+set.seed(main.seed) #need to run this right before all Unifrac distance matrices calculations 
+M24_wunifrac_totalvar <- phyloseq::distance(physeq_M24_totalvar, method = "wunifrac", type = "samples")
+set.seed(main.seed) 
+M24_unifrac_totalvar <- phyloseq::distance(physeq_M24_totalvar, method = "unifrac", type = "samples")
+M24_jaccard_totalvar  <- phyloseq::distance(physeq_M24_totalvar, method = "jaccard", type = "samples")
+M24_bc_totalvar  <- phyloseq::distance(physeq_M24_totalvar, method = "bray", type = "samples")
+
+#get dataframe of metadata
+metadata_physeq_M24_totalvar <- data.frame(sample_data(physeq_M24_totalvar)) #get data frame of metadata
+
+#perform PERMANOVAs with each distance matrix
+set.seed(main.seed) #need to run this before Unifrac distance matrices calculations 
+adonis(M24_wunifrac_totalvar~total_variety, data=metadata_physeq_M24_totalvar)#ns
+set.seed(main.seed)
+adonis(M24_unifrac_totalvar~total_variety, data=metadata_physeq_M24_totalvar) #ns
+adonis(M24_jaccard_totalvar~total_variety, data=metadata_physeq_M24_totalvar)$aov.tab #ns
+adonis(M24_bc_totalvar~total_variety, data=metadata_physeq_M24_totalvar)$aov.tab #ns
+
+# is food group variety associated with beta diversity?
+physeq_M24_foodvar <- subset_samples(physeq_M24_diet, !is.na(foodgroup_variety)) #create a dataset that is complete on total vareity; necessary for distance matrix calculations to work
+
+#get distance matrices (weighted unifrac, unweighted unifrac, bray-curtis, jaccard)
+set.seed(main.seed) #need to run this right before all Unifrac distance matrices calculations 
+M24_wunifrac_foodvar <- phyloseq::distance(physeq_M24_foodvar, method = "wunifrac", type = "samples")
+set.seed(main.seed) 
+M24_unifrac_foodvar <- phyloseq::distance(physeq_M24_foodvar, method = "unifrac", type = "samples")
+M24_jaccard_foodvar  <- phyloseq::distance(physeq_M24_foodvar, method = "jaccard", type = "samples")
+M24_bc_foodvar  <- phyloseq::distance(physeq_M24_foodvar, method = "bray", type = "samples")
+
+#get dataframe of metadata
+metadata_physeq_M24_foodvar <- data.frame(sample_data(physeq_M24_foodvar)) #get data frame of metadata
+
+#perform PERMANOVAs with each distance matrix
+set.seed(main.seed) #need to run this before Unifrac distance matrices calculations 
+adonis(M24_wunifrac_foodvar~foodgroup_variety, data=metadata_physeq_M24_foodvar)$aov.tab#ns
+set.seed(main.seed)
+adonis(M24_unifrac_foodvar~foodgroup_variety, data=metadata_physeq_M24_foodvar)$aov.tab #ns
+adonis(M24_jaccard_foodvar~foodgroup_variety, data=metadata_physeq_M24_foodvar)$aov.tab #ns
+adonis(M24_bc_foodvar~foodgroup_variety, data=metadata_physeq_M24_foodvar)$aov.tab #ns
+
+# is protein sources variety associated with beta diversity?
+physeq_M24_proteinvar <- subset_samples(physeq_M24_diet, !is.na(protein_variety)) #create a dataset that is complete on total vareity; necessary for distance matrix calculations to work
+
+#get distance matrices (weighted unifrac, unweighted unifrac, bray-curtis, jaccard)
+set.seed(main.seed) #need to run this right before all Unifrac distance matrices calculations 
+M24_wunifrac_proteinvar <- phyloseq::distance(physeq_M24_proteinvar, method = "wunifrac", type = "samples")
+set.seed(main.seed) 
+M24_unifrac_proteinvar <- phyloseq::distance(physeq_M24_proteinvar, method = "unifrac", type = "samples")
+M24_jaccard_proteinvar  <- phyloseq::distance(physeq_M24_proteinvar, method = "jaccard", type = "samples")
+M24_bc_proteinvar  <- phyloseq::distance(physeq_M24_proteinvar, method = "bray", type = "samples")
+
+#get dataframe of metadata
+metadata_physeq_M24_proteinvar <- data.frame(sample_data(physeq_M24_proteinvar)) #get data frame of metadata
+
+#perform PERMANOVAs with each distance matrix
+set.seed(main.seed) #need to run this before Unifrac distance matrices calculations 
+adonis(M24_wunifrac_proteinvar~protein_variety, data=metadata_physeq_M24_proteinvar)$aov.tab#ns
+set.seed(main.seed)
+adonis(M24_unifrac_proteinvar~protein_variety, data=metadata_physeq_M24_proteinvar)$aov.tab #ns
+adonis(M24_jaccard_proteinvar~protein_variety, data=metadata_physeq_M24_proteinvar)$aov.tab #ns
+adonis(M24_bc_proteinvar~protein_variety, data=metadata_physeq_M24_proteinvar)$aov.tab #ns
+```
+
+## Differential abundance
+```{r}
+#load files
+tax_features_ra_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/M24_tax_features_ra.tsv"
+M24_metadata_variety <- read_tsv("../../data/microbiome/M24_M48/input_files/M24_metadata_typeheader_new_rev_dqi.tsv")
+
+#remove typeheader so that variable type can be read correctly by R
+M24_metadata_variety <- M24_metadata_variety[-1, ]
+
+#write metadata file with M24 samples as .tsv
+M24_meta_var_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/M24_metadata_variety.tsv"
+write_tsv(M24_metadata_variety, M24_meta_var_fp)
+#manually open the .tsv and save it as .csv
+csv_file <- "../../data/analysis_datasets/fran/maaslin2/inputs/M24_metadata_variety.csv"
+#read .csv into R -- after removing the typeheader, this will automatically assign each variable to the correct type
+test <- read_csv(csv_file)
+
+#write new metadata file with correct dadta types back to original file path
+write_tsv(test, "../../data/analysis_datasets/fran/maaslin2/inputs/M24_metadata_variety.tsv")
+
+#load final metadata file for analysis below
+M24_metadata_variety_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/M24_metadata_variety.tsv"
+
+#total diet variety
+maaslin2_totalvar_05 = Maaslin2(
+  input_data = tax_features_ra_fp,
+  input_metadata = M24_metadata_variety_fp,
+  output = "../../data/analysis_datasets/fran/maaslin2/final_results/only_covs/total_diet_variety/total_diet_variety_0.5p",
+  min_abundance = 0,
+  min_prevalence = 0.005,
+  max_significance = 0.25,
+  analysis_method = "lm", 
+  fixed_effects = c("total_variety"),
+  standardize = TRUE,
+  reference = NULL
+)
+
+# food group variety
+maaslin2_foodvar_05 = Maaslin2(
+  input_data = tax_features_ra_fp,
+  input_metadata = M24_metadata_variety_fp,
+  output = "../../data/analysis_datasets/fran/maaslin2/final_results/only_covs/diet_variety/food_diet_variety_0.5p",
+  min_abundance = 0,
+  min_prevalence = 0.005,
+  max_significance = 0.25,
+  analysis_method = "lm", 
+  fixed_effects = c("foodgroup_variety"),
+  standardize = TRUE,
+  reference = NULL
+)
+
+# protein group variety
+maaslin2_foodvar_05 = Maaslin2(
+  input_data = tax_features_ra_fp,
+  input_metadata = M24_metadata_variety_fp,
+  output = "../../data/analysis_datasets/fran/maaslin2/final_results/only_covs/diet_variety/protein_diet_variety_0.5p",
+  min_abundance = 0,
+  min_prevalence = 0.005,
+  max_significance = 0.25,
+  analysis_method = "lm", 
+  fixed_effects = c("protein_variety"),
+  standardize = TRUE,
+  reference = NULL
+)
+```
+
+# Examine adverstiy differences in diet variables
+```{r}
+#correlations with continuous adversities
+adv_diet_cor <- alpha_diversity_stress_usable_dietvar %>% dplyr::select(STAI_prorated_state_pw26, ctq_total_score_25it, DQI.score.adjusted, Fibre.per.1000kcal, SatFat_., MUFA_., PUFA_., `Protein_%energy`, `Fat_%energy`, `CHO_%energy`, foodgroup_variety, total_variety, protein_variety)
+
+library(Hmisc)
+rcorr(as.matrix(adv_diet_cor)) #all p-values for correlations >= .05
+
+# t-tests with postnatal stress
+t.test(DQI.score.adjusted~ postnatal_stress, data=alpha_diversity_stress_usable_dietvar) #ns
+t.test(Fibre.per.1000kcal~ postnatal_stress, data=alpha_diversity_stress_usable_dietvar) #ns
+t.test(SatFat_.~ postnatal_stress, data=alpha_diversity_stress_usable_dietvar) #ns
+t.test(MUFA_.~ postnatal_stress, data=alpha_diversity_stress_usable_dietvar) #ns
+t.test(PUFA_.~ postnatal_stress, data=alpha_diversity_stress_usable_dietvar) #ns
+t.test(`Protein_%energy`~ postnatal_stress, data=alpha_diversity_stress_usable_dietvar) #ns
+t.test(`Fat_%energy`~ postnatal_stress, data=alpha_diversity_stress_usable_dietvar) #ns
+t.test(`CHO_%energy` ~ postnatal_stress, data=alpha_diversity_stress_usable_dietvar) #ns
+t.test(foodgroup_variety ~ postnatal_stress, data=alpha_diversity_stress_usable_dietvar) #ns
+t.test(total_variety ~ postnatal_stress, data=alpha_diversity_stress_usable_dietvar) #ns
+t.test(protein_variety ~ postnatal_stress, data=alpha_diversity_stress_usable_dietvar) #ns
+
+#ANOVAs with cumulative adversity
+summary(aov(DQI.score.adjusted~postnatal_stress, data=alpha_diversity_stress_usable_dietvar)) #ns
+summary(aov(Fibre.per.1000kcal~postnatal_stress, data=alpha_diversity_stress_usable_dietvar)) #ns
+summary(aov(SatFat_.~postnatal_stress, data=alpha_diversity_stress_usable_dietvar)) #ns
+summary(aov(MUFA_.~postnatal_stress, data=alpha_diversity_stress_usable_dietvar)) #ns
+summary(aov(PUFA_.~postnatal_stress, data=alpha_diversity_stress_usable_dietvar)) #ns
+summary(aov(`Protein_%energy`~postnatal_stress, data=alpha_diversity_stress_usable_dietvar)) #ns
+summary(aov(`Fat_%energy`~postnatal_stress, data=alpha_diversity_stress_usable_dietvar)) #ns
+summary(aov(`CHO_%energy`~postnatal_stress, data=alpha_diversity_stress_usable_dietvar)) #ns
+summary(aov(foodgroup_variety~postnatal_stress, data=alpha_diversity_stress_usable_dietvar)) #ns
+summary(aov(total_variety~postnatal_stress, data=alpha_diversity_stress_usable_dietvar)) #ns
+summary(aov(protein_variety~postnatal_stress, data=alpha_diversity_stress_usable_dietvar)) #ns
+
+# summary: no significant differences in any diet variables by adversity variables
+```
+
+
+# Sensitivity analysis: redo main analyses in Chinese subsample
+## Obtain subsample 
+```{r}
+# for alpha diversity
+alpha_div_all_cov_complete_chinese <- alpha_div_all_cov_complete %>% 
+  dplyr::filter(mother_ethnicity=="chinese")
+
+# for beta diversity
+general_mb_path <- "../../data/microbiome/M24_M48/"
+otu_table_path <- str_c(general_mb_path, "input_files/M2448_feature-table.qza")
+tree_path <- str_c(general_mb_path, "input_files/M2448_rep_otu-tree.qza")
+taxonomy_path <- str_c(general_mb_path, "input_files/M2448_taxonomy.qza")
+metadata_path <- str_c(general_mb_path, "input_files/M24_metadata_typeheader_new_rev_dqi.tsv")
+
+physeq_M2448_dqi <- qza_to_phyloseq(
+  features=otu_table_path,
+  tree=tree_path,
+  taxonomy=taxonomy_path,
+  metadata=metadata_path
+)
+
+#create a phyloseq object containing only 24M samples
+physeq_M24_dqi <- subset_samples(physeq_M2448_dqi, Timepoint_months=="24")
+```
+
+## Alpha diversity by each exposure with covariates, Chinese subsample
+```{r}
+# faith
+cov1_mod_mult_faith_chinese <- lm(faith_pd~ctq_total_score_25it+STAI_prorated_state_pw26+postnatal_stress+sex_binary+deliv_mode+Fibre.per.1000kcal+monthly_income_per_member+PUFA_.+Sequencing_batch, data = alpha_div_all_cov_complete_chinese)
+
+knitr::knit_print(tab_model(cov1_mod_mult_faith_chinese, robust=TRUE, show.se=TRUE, show.std=TRUE, show.stat=TRUE))
+#file="../../manuscripts/fran_adversity_microbiome/tables/alpha_diversity/faith_covs.doc"
+
+# try recoding sequencing batch to be 1, 2 for effect size to work
+alpha_div_all_cov_complete_chinese <- alpha_div_all_cov_complete_chinese %>% 
+  dplyr::mutate(
+    Sequencing_batch_num = ifelse(Sequencing_batch=="batch1", 1, 2)
+  )
+
+eta_faith_covs <- with(alpha_div_all_cov_complete_chinese, spcor(cbind(deliv_mode, sex_binary, monthly_income_per_member, Sequencing_batch_num, Fibre.per.1000kcal, PUFA_., ctq_total_score_25it, STAI_prorated_state_pw26, postnatal_stress, faith_pd))$estimate^2) 
+
+# observed
+cov1_mod_mult_feat_chinese <- lm(observed_features~ctq_total_score_25it+STAI_prorated_state_pw26+postnatal_stress+sex_binary+deliv_mode+Fibre.per.1000kcal+monthly_income_per_member+PUFA_.+Sequencing_batch, data = alpha_div_all_cov_complete_chinese)
+
+knitr::knit_print(tab_model(cov1_mod_mult_feat_chinese, robust=TRUE, show.se=TRUE, show.std=TRUE, show.stat=TRUE))
+#file="../../manuscripts/fran_adversity_microbiome/tables/alpha_diversity/faith_covs.doc"
+
+eta_feat_covs <- with(alpha_div_all_cov_complete_chinese, spcor(cbind(deliv_mode, sex_binary, monthly_income_per_member, Sequencing_batch_num, Fibre.per.1000kcal, PUFA_., ctq_total_score_25it, STAI_prorated_state_pw26, postnatal_stress, observed_features))$estimate^2) 
+
+# evenness
+cov1_mod_mult_even_chinese <- lm(pielou_evenness~ctq_total_score_25it+STAI_prorated_state_pw26+postnatal_stress+sex_binary+deliv_mode+Fibre.per.1000kcal+monthly_income_per_member+PUFA_.+Sequencing_batch, data = alpha_div_all_cov_complete_chinese)
+
+knitr::knit_print(tab_model(cov1_mod_mult_even_chinese, robust=TRUE, show.se=TRUE, show.std=TRUE, show.stat=TRUE))
+#file="../../manuscripts/fran_adversity_microbiome/tables/alpha_diversity/faith_covs.doc"
+
+eta_even_covs <- with(alpha_div_all_cov_complete_chinese, spcor(cbind(deliv_mode, sex_binary, monthly_income_per_member, Sequencing_batch_num, Fibre.per.1000kcal, PUFA_., ctq_total_score_25it, STAI_prorated_state_pw26, postnatal_stress, pielou_evenness))$estimate^2) 
+
+# shannon
+cov1_mod_mult_shan_chinese <- lm(shannon_entropy~ctq_total_score_25it+STAI_prorated_state_pw26+postnatal_stress+sex_binary+deliv_mode+Fibre.per.1000kcal+monthly_income_per_member+PUFA_.+Sequencing_batch, data = alpha_div_all_cov_complete_chinese)
+
+knitr::knit_print(tab_model(cov1_mod_mult_shan_chinese, robust=TRUE, show.se=TRUE, show.std=TRUE, show.stat=TRUE))
+
+eta_shan_covs <- with(alpha_div_all_cov_complete_chinese, spcor(cbind(deliv_mode, sex_binary, monthly_income_per_member, Sequencing_batch_num, Fibre.per.1000kcal, PUFA_., ctq_total_score_25it, STAI_prorated_state_pw26, postnatal_stress, shannon_entropy))$estimate^2) 
+```
+
+## Alpha diversity analyses by cumulative adversity with covariates, Chinese subsample
+```{r}
+#dummy code cumulative adversity in comparison to no exposure group
+alpha_div_all_cov_complete_chinese <- base::transform(alpha_div_all_cov_complete_chinese,
+                       cumulative_0v1 = (cumulative_adv == "1"),
+                       cumulative_0v2 = (cumulative_adv == "2"))
+#0 (no adversity exposure) is the reference group
+#factor 1 = no exposure relative to 1 timepoint
+#factor 2 = no exposure relative to 2+ timepoints
+
+# faith
+cov1_mod_cumulative0v2_faith_ch <- lm(faith_pd~cumulative_0v1 + cumulative_0v2+sex_binary + deliv_mode+Fibre.per.1000kcal+monthly_income_per_member+PUFA_.+Sequencing_batch, data = alpha_div_all_cov_complete_chinese)
+
+#run models (HC3 robust standard errors, showing standardized SE and coefficients, and saving to file)
+knitr::knit_print(tab_model(cov1_mod_cumulative0v2_faith_ch, robust=TRUE, show.se=TRUE, show.std=TRUE, show.stat=TRUE))
+
+alpha_div_all_cov_complete_chinese <- alpha_div_all_cov_complete_chinese %>% 
+  dplyr::mutate(
+    cumulative_0v1_num = ifelse(cumulative_0v1==TRUE, 1, 0),
+    cumulative_0v2_num = ifelse(cumulative_0v2==TRUE, 1, 0)
+  )
+
+eta_cumul_faith_covs <- with(alpha_div_all_cov_complete_chinese, spcor(cbind(cumulative_0v1_num, cumulative_0v2_num, deliv_mode, sex_binary, monthly_income_per_member, Sequencing_batch_num,Fibre.per.1000kcal, PUFA_., faith_pd))$estimate^2) 
+kable(eta_cumul_faith_covs[,ncol(eta_cumul_faith_covs)], col.names="R^2 of each variable on Faith's PD") %>% kable_styling()
+
+# observed features
+cov1_mod_cumulative_feat_ch <- lm(observed_features~cumulative_0v1 + cumulative_0v2+sex_binary + deliv_mode+Fibre.per.1000kcal+monthly_income_per_member+PUFA_.+Sequencing_batch, data = alpha_div_all_cov_complete_chinese)
+
+#run models (HC3 robust standard errors, showing standardized SE and coefficients, and saving to file)
+knitr::knit_print(tab_model(cov1_mod_cumulative_feat_ch, robust=TRUE, show.se=TRUE, show.std=TRUE, show.stat=TRUE))
+
+eta_cumul_feat_covs <- with(alpha_div_all_cov_complete_chinese, spcor(cbind(cumulative_0v1_num, cumulative_0v2_num, deliv_mode, sex_binary, monthly_income_per_member, Sequencing_batch_num,Fibre.per.1000kcal, PUFA_., observed_features))$estimate^2) 
+ kable(eta_cumul_feat_covs[,ncol(eta_cumul_feat_covs)], col.names="R^2 of each variable on Observed Features") %>% kable_styling()
+
+# evenness
+cov1_mod_cumulative0v2_even_ch <- lm(pielou_evenness~cumulative_0v1 + cumulative_0v2+sex_binary + deliv_mode+Fibre.per.1000kcal+monthly_income_per_member+PUFA_.+Sequencing_batch, data = alpha_div_all_cov_complete_chinese)
+
+#run models (HC3 robust standard errors, showing standardized SE and coefficients, and saving to file)
+knitr::knit_print(tab_model(cov1_mod_cumulative0v2_even_ch, robust=TRUE, show.se=TRUE, show.std=TRUE, show.stat=TRUE)) 
+ 
+eta_cumul_even_covs <- with(alpha_div_all_cov_complete_chinese, spcor(cbind(cumulative_0v1_num, cumulative_0v2_num, deliv_mode, sex_binary, monthly_income_per_member, Sequencing_batch_num, Fibre.per.1000kcal, PUFA_.,pielou_evenness))$estimate^2) 
+kable(eta_cumul_even_covs[,ncol(eta_cumul_even_covs)], col.names="R^2 of each variable on Pielou Evenness") %>% kable_styling()
+
+# shannon
+cov1_mod_cumulative0v2_sum_ch <- lm(shannon_entropy~cumulative_0v1 + cumulative_0v2+deliv_mode+sex_binary+Fibre.per.1000kcal+monthly_income_per_member+PUFA_.+Sequencing_batch, data = alpha_div_all_cov_complete_chinese)
+
+knitr::knit_print(tab_model(cov1_mod_cumulative0v2_sum_ch, robust=TRUE, show.se=TRUE, show.std=TRUE, show.stat=TRUE))
+
+eta_cumul_shannon_covs <- with(alpha_div_all_cov_complete_chinese, spcor(cbind(cumulative_0v1_num, cumulative_0v2_num, deliv_mode, sex_binary, monthly_income_per_member, Fibre.per.1000kcal, PUFA_., Sequencing_batch_num, shannon_entropy))$estimate^2) 
+kable(eta_cumul_shannon_covs[,ncol(eta_cumul_shannon_covs)], col.names="R^2 of each variable on Shannon Index") %>% kable_styling()
+```
+
+## Beta diversity analyses by each exposure with covariates, Chinese subsample
+```{r}
+main.seed = 1028
+
+#INCLUDING COVARIATES
+#create a phyloseq object with complete cases on adversity variables and covaraites
+physeq_M24_all_dqi <- subset_samples(physeq_M24_dqi, !is.na(postnatal_stress) & !is.na(maltreated_mod_rev) & !is.na(stai_state_above_clin_cutoff_pw26) & !is.na(only_bf_months) & !is.na(deliv_mode) & !is.na(mother_ethnicity) & !is.na(antibio_M24) & !is.na(Sequencing_batch) & !is.na(PUFA_.)) #N=157 for this analysis
+
+nsamples(physeq_M24_all_dqi) #157
+
+physeq_M24_dqi_chinese <- subset_samples(physeq_M24_all_dqi, mother_ethnicity=="chinese") #n=123
+
+#calculate distance matrices using this complete cases dataset
+set.seed(main.seed)
+M24_wunifrac_dqi_ch <- phyloseq::distance(physeq_M24_dqi_chinese, method = "wunifrac", type = "samples")
+set.seed(main.seed)
+M24_unifrac_dqi_ch <- phyloseq::distance(physeq_M24_dqi_chinese, method = "unifrac", type = "samples")
+M24_bc_dqi_ch <- phyloseq::distance(physeq_M24_dqi_chinese, method = "bray", type = "samples")
+M24_jaccard_dqi_ch <- phyloseq::distance(physeq_M24_dqi_chinese, method = "jaccard", type = "samples")
+
+#get metadata
+metadata_physeq_M24_dqi_ch <- data.frame(sample_data(physeq_M24_dqi_chinese)) #get data frame of metadata
+
+#permanovas
+#weighted unifrac
+set.seed(main.seed)
+wunifrac_covs_dqi_ch <- adonis(M24_wunifrac_dqi_ch~ postnatal_stress+maltreated_mod_rev+stai_state_above_clin_cutoff_pw26+ antibio_M24+deliv_mode+only_bf_months+Fibre.per.1000kcal+PUFA_.+Sequencing_batch, data=metadata_physeq_M24_dqi_ch) 
+wunifrac_covs_dqi_ch$aov.tab #print output
+omega_sq_adonis(wunifrac_covs_dqi_ch) #calculates omega squared for first predictor; change order of vars to get omega squared for other predictors
+
+#unweighted unifrac
+set.seed(main.seed)
+unifrac_covs_dqi_ch <- adonis(M24_unifrac_dqi_ch~ postnatal_stress+stai_state_above_clin_cutoff_pw26+maltreated_mod_rev +antibio_M24+deliv_mode+only_bf_months+Fibre.per.1000kcal+PUFA_.+Sequencing_batch, data=metadata_physeq_M24_dqi_ch) 
+unifrac_covs_dqi_ch$aov.tab #print output
+omega_sq_adonis(unifrac_covs_dqi_ch)
+
+#bray-curtis
+bc_covs_dqi_ch <- adonis(M24_bc_dqi_ch~ postnatal_stress +stai_state_above_clin_cutoff_pw26+maltreated_mod_rev+antibio_M24+deliv_mode+only_bf_months+Fibre.per.1000kcal+PUFA_.+Sequencing_batch, data=metadata_physeq_M24_dqi_ch) 
+bc_covs_dqi_ch$aov.tab #print output
+omega_sq_adonis(bc_covs_dqi_ch)
+
+#jaccard
+jacc_covs_dqi_ch <- adonis(M24_jaccard_dqi_ch~postnatal_stress+maltreated_mod_rev +stai_state_above_clin_cutoff_pw26+antibio_M24+deliv_mode+only_bf_months+Fibre.per.1000kcal+PUFA_.+Sequencing_batch, data=metadata_physeq_M24_dqi_ch) 
+jacc_covs_dqi_ch$aov.tab #print output
+omega_sq_adonis(jacc_covs_dqi_ch)
+```
+
+## Beta diversity analyses by cumulative adversity with covariates, Chinese subsample
+```{r}
+# get dataset
+physeq_M24_cumulative_dqi <- subset_samples(physeq_M24_dqi, !is.na(cumulative_adv) & !is.na(only_bf_months) & !is.na(deliv_mode) & !is.na(mother_ethnicity) & !is.na(antibio_M24) & !is.na(Sequencing_batch) & !is.na(PUFA_.)) #N=157
+
+physeq_M24_cumulative_ch <- subset_samples(physeq_M24_cumulative_dqi, mother_ethnicity=="chinese")
+nsamples(physeq_M24_cumulative_ch) #N=123
+
+#calculate distance matrices
+set.seed(main.seed)
+M24_wunifrac_cumulative_ch <- phyloseq::distance(physeq_M24_cumulative_ch, method = "wunifrac", type = "samples")
+set.seed(main.seed)
+M24_unifrac_cumulative_ch <- phyloseq::distance(physeq_M24_cumulative_ch, method = "unifrac", type = "samples")
+M24_bc_cumulative_ch <- phyloseq::distance(physeq_M24_cumulative_ch, method = "bray", type = "samples")
+M24_jaccard_cumulative_ch <- phyloseq::distance(physeq_M24_cumulative_ch, method = "jaccard", type = "samples")
+
+#get metadata
+metadata_physeq_M24_cumulative_ch <- data.frame(sample_data(physeq_M24_cumulative_ch)) #get data frame of metadata
+
+#permanovas 
+#weighted unifrac
+set.seed(main.seed)
+wunifrac_cumulative_covs_ch <- adonis(M24_wunifrac_cumulative_ch~cumulative_adv+antibio_M24+deliv_mode+only_bf_months+Fibre.per.1000kcal+PUFA_.+Sequencing_batch, data=metadata_physeq_M24_cumulative_ch) 
+wunifrac_cumulative_covs_ch$aov.tab
+omega_sq_adonis(wunifrac_cumulative_covs_ch)
+
+#unweighted unifrac
+set.seed(main.seed)
+unifrac_cumulative_covs_ch <- adonis(M24_unifrac_cumulative_ch~cumulative_adv+antibio_M24+deliv_mode+only_bf_months+Fibre.per.1000kcal+PUFA_.+Sequencing_batch, data=metadata_physeq_M24_cumulative_ch)
+unifrac_cumulative_covs_ch$aov.tab
+omega_sq_adonis(unifrac_cumulative_covs_ch)
+
+#bray-curtis
+bc_cumulative_covs_ch <- adonis(M24_bc_cumulative_ch~cumulative_adv+antibio_M24+deliv_mode+only_bf_months+Fibre.per.1000kcal+PUFA_.+Sequencing_batch, data=metadata_physeq_M24_cumulative_ch)
+bc_cumulative_covs_ch$aov.tab
+omega_sq_adonis(bc_cumulative_covs_ch)
+
+#jaccard
+jacc_cumulative_covs_ch <- adonis(M24_jaccard_cumulative_ch~cumulative_adv+antibio_M24+deliv_mode+only_bf_months+Fibre.per.1000kcal+PUFA_.+Sequencing_batch, data=metadata_physeq_M24_cumulative_ch)
+jacc_cumulative_covs_ch$aov.tab
+omega_sq_adonis(jacc_cumulative_covs_ch)
+```
+
+## Differential abundance with all exposures entered together, Chinese subsample
+```{r}
+#load files
+tax_features_ra_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/M24_tax_features_ra.tsv"
+M24_metadata <- read_tsv("../../data/analysis_datasets/fran/maaslin2/inputs/M24_metadata.tsv")
+
+M24_metadata_ch <- M24_metadata %>% dplyr::filter(mother_ethnicity=="chinese")
+write_tsv(M24_metadata_ch, "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_M24_chinesesubsamp.tsv")
+M24_metadata_ch_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_M24_chinesesubsamp.tsv"
+
+#ALL ADVERSITIES TOGETHER
+#create all adversity metadata
+alladv_metadata <- M24_metadata %>% 
+  filter(!is.na(postnatal_stress) & !is.na(STAI_prorated_state_pw26) & !is.na(ctq_total_score_25it) & !is.na(mother_ethnicity) & !is.na(only_bf_months) & !is.na(probiotics_M24) & !is.na(Sequencing_batch) & !is.na(c_age_years_stoolproxy_m24)) #N=196
+
+alladv_metadata_ch <- alladv_metadata %>% 
+  dplyr::filter(mother_ethnicity=="chinese") #N=149
+
+write_tsv(alladv_metadata_ch, "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_alladv_chinesesubsamp.tsv")
+alladv_metadata_ch_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_alladv_chinesesubsamp.tsv"
+
+#All adversities -- 0.5% filtering threshold
+maaslin2_alladv_withcov_05_ch = Maaslin2(
+  input_data = tax_features_ra_fp,
+  input_metadata = alladv_metadata_ch_fp,
+  output = "../../data/analysis_datasets/fran/maaslin2/final_results/adversity/with_covs/chinese_subsample/alladv_wcovs_0.5p_chinese_compcases_test",
+  min_abundance = 0,
+  min_prevalence = 0.005,
+  max_significance = 0.25,
+  analysis_method = "lm", 
+  fixed_effects = c("postnatal_stress_s", "STAI_prorated_state_pw26", "ctq_total_score_25it", "only_bf_months", "c_age_years_stoolproxy_m24", "Sequencing_batch"),
+  standardize = TRUE,
+  reference = c('only_bf_months,<1M') 
+)
+```
+
+## Differential abundance with each adversity exposure, Chinese subsample
+### Preconception adversity
+```{r}
+#PRECONCEPTION ADVERSITY
+#create complete metadata files to be used for these
+precon_metadata_ch <- M24_metadata %>% 
+  filter(!is.na(ctq_total_score_25it) & !is.na(Sequencing_batch) & !is.na(only_bf_months) & !is.na(mother_ethnicity) & !is.na(Fibre.per.1000kcal)) %>% dplyr::filter(mother_ethnicity=="chinese") #N=167
+write_tsv(precon_metadata_ch, "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_precon_chinesesubsamp.tsv")
+precon_meta_ch_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_precon_chinesesubsamp.tsv"
+
+#preconception adversity -- 0.5% filtering threshold
+maaslin_maltreatment_covs_0.5p <- Maaslin2(
+  input_data = tax_features_ra_fp,
+  input_metadata = precon_meta_ch_fp,
+  output = "../../data/analysis_datasets/fran/maaslin2/final_results/adversity/with_covs/chinese_subsample/precon_wcovs_0.5p_chinese_compcases",
+  min_abundance = 0,
+  min_prevalence = 0.005, 
+  max_significance = 0.25, 
+  analysis_method = "lm", 
+  fixed_effects = c("only_bf_months", "ctq_total_score_25it", "Sequencing_batch", "Fibre.per.1000kcal"),
+  standardize = TRUE, 
+  reference = c('only_bf_months,<1M') 
+)
+```
+
+### Prenatal adversity
+```{r}
+#PRENATAL ADVERSITY
+#create prenatal adversity metadata
+prenat_metadata_ch <- M24_metadata %>% 
+  filter(!is.na(STAI_prorated_state_pw26) & !is.na(Sequencing_batch) & !is.na(only_bf_months) & !is.na(probiotics_M24) & !is.na(mother_ethnicity) & !is.na(Fibre.per.1000kcal)) %>% dplyr::filter(mother_ethnicity=="chinese") #N=231
+write_tsv(prenat_metadata_ch, "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_prenat_chinesesubsamp.tsv")
+prenat_metadata_ch_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_prenat_chinesesubsamp.tsv"
+
+#prenatal adversity -- 0.5% filtering threshold 
+maaslin_prenatanx_covs_0.5p <- Maaslin2(
+  input_data = tax_features_ra_fp,
+  input_metadata = prenat_metadata_ch_fp,
+  output = "../../data/analysis_datasets/fran/maaslin2/final_results/adversity/with_covs/chinese_subsample/prenat_wcovs_0.5p_chinese_compcases",
+  min_abundance = 0,
+  min_prevalence = 0.005, 
+  max_significance = 0.25, 
+  analysis_method = "lm", #default
+  fixed_effects = c("only_bf_months", "probiotics_M24", "STAI_prorated_state_pw26", "Sequencing_batch", "Fibre.per.1000kcal"),
+  standardize = TRUE, 
+  reference = c('only_bf_months, c(3, 4, 5)') 
+)
+```
+
+### Postnatal adversity
+```{r}
+#POSTNATAL ADVERSITY
+#create postnatal adversity metadata
+postnat_metadata_ch <- M24_metadata %>% 
+  filter(!is.na(postnatal_stress) & !is.na(mother_ethnicity)) %>% dplyr::filter(mother_ethnicity=="chinese") #N=260
+write_tsv(postnat_metadata_ch, "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_postnat_chinesesubsamp.tsv")
+postnat_metadata_ch_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_postnat_chinesesubsamp.tsv"
+
+maaslin_poststress_covs_0.5p <- Maaslin2(
+  input_data = tax_features_ra_fp,
+  input_metadata = postnat_metadata_ch_fp,
+  output = "../../data/analysis_datasets/fran/maaslin2/final_results/adversity/with_covs/chinese_subsample/postnat_wcovs_0.5p_chinese_compcases",
+  min_abundance = 0,
+  min_prevalence = 0.005, 
+  max_significance = 0.25, 
+  analysis_method = "lm", 
+  fixed_effects = c("postnatal_stress_s"),
+  standardize = TRUE, 
+  reference = NULL
+)
+```
+
+## Differential abundance with cumulative adversity, Chinese subsample
+```{r}
+#CUMULATIVE ADVERSITY
+#create complete cases dataset to determine N and N.not.0
+cumulative_metadata_nocovs_ch <- M24_metadata %>% 
+  filter(!is.na(cumulative_adv_s) & mother_ethnicity=="chinese") #N=171
+write_tsv(cumulative_metadata_nocovs_ch, "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_cumulative_nocovs_chinesesubsamp.tsv")
+cumulative_metadata_nocovs_ch_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_cumulative_nocovs_chinesesubsamp.tsv"
+
+maaslin2_cumulative_nocov_0.5 = Maaslin2(
+  input_data = tax_features_ra_fp,
+  input_metadata = cumulative_metadata_nocovs_ch_fp,
+  output = "../../data/analysis_datasets/fran/maaslin2/final_results/adversity/no_covs/cumulative_adversity/cumulative_nocovs_0.5p_chinesesubsamp_compcases",
+  min_abundance = 0,
+  min_prevalence = 0.005,
+  max_significance = 0.25, 
+  analysis_method = "lm",
+  fixed_effects = c("cumulative_adv_s"),
+  standardize = TRUE, 
+  reference = c("cumulative_adv_s,0 tp") 
+)
+```
+
+## Differential abudnance with Child SEF, Chinese subsample 
+### Total Problems, 2 years
+```{r}
+#TOTAL PROBLEMS
+#create metadata file with complete cases for total
+tot2_metadata_ch <- M24_metadata %>% 
+  filter(!is.na(cbcltotprobtot_m24_std) & !is.na(STAI_prorated_state_pw26) & !is.na(sex_binary) & !is.na(Sequencing_batch) & !is.na(ctq_total_score_25it)) %>% dplyr::filter(mother_ethnicity=="chinese") #N=
+write_tsv(tot2_metadata_ch, "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_totM24_chinesesubsamp.tsv")
+tot2_metadata_ch_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_totM24_chinesesubsamp.tsv" 
+
+#Total problems - 0.5% filtering threshold
+maaslin_tot_0.5p = Maaslin2(
+  input_data = tax_features_ra_fp,
+  input_metadata = tot2_metadata_ch_fp,
+  output = "../../data/analysis_datasets/fran/maaslin2/final_results/cbcl/m24/chinese_subsample/tot_raw_0.5p_results_compcases_chinesesubsamp",
+  min_abundance = 0,
+  min_prevalence = 0.005,
+  max_significance = 0.25, 
+  analysis_method = "lm", #default
+  fixed_effects = c("cbcltotprobtot_m24_std", "ctq_total_score_25it", "STAI_prorated_state_pw26", "sex_binary_ch", "Sequencing_batch"),
+  standardize = TRUE
+)
+```
+
+### Dev problems, 2 years
+```{r}
+#DEVELOPMENTAL PROBLEMS
+dev2_metadata_ch <- M24_metadata %>% 
+  filter(!is.na(cbcldevprobtot_m24_std) & !is.na(STAI_prorated_state_pw26) & !is.na(sex_binary) & !is.na(deliv_mode_str) & !is.na(only_bf_months) & !is.na(Sequencing_batch)) %>% dplyr::filter(mother_ethnicity=="chinese") #N=134
+write_tsv(dev2_metadata_ch, "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_devM24_chinesesubsamp.tsv")
+dev2_metadata_ch_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_devM24_chinesesubsamp.tsv"
+
+#developmental problems - 0.5% filtering threshold
+maaslin_dev2_0.5p = Maaslin2(
+  input_data = tax_features_ra_fp,
+  input_metadata = dev2_metadata_ch_fp,
+  output = "../../data/analysis_datasets/fran/maaslin2/final_results/cbcl/m24/chinese_subsample/dev_raw_0.5p_results_compcases_chinesesub",
+  min_abundance = 0,
+  min_prevalence = 0.005,
+  max_significance = 0.25, 
+  analysis_method = "lm", #default
+  fixed_effects = c("cbcldevprobtot_m24_std", "STAI_prorated_state_pw26", "sex_binary_ch", "deliv_mode_str", "only_bf_months", "Sequencing_batch"),
+  standardize = TRUE
+) 
+```
+
+### Internalizing problems, age 2 years
+```{r}
+#INTERNALIZING PROBLESM
+#create metadata file with complete cases for internalizing
+int2_metadata_ch <- M24_metadata %>% 
+  filter(!is.na(cbclintprobtot_m24_std) & !is.na(STAI_prorated_state_pw26) & !is.na(sex_binary)) %>% dplyr::filter(mother_ethnicity=="chinese") #N=138
+write_tsv(int2_metadata_ch, "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_intM24_chinesesubsamp.tsv")
+int2_metadata_ch_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_intM24_chinesesubsamp.tsv"
+
+# Internalizing problems - 0.5% filtering threshold
+maaslin_int_0.5p = Maaslin2(
+  input_data = tax_features_ra_fp,
+  input_metadata = int2_metadata_ch_fp,
+  output = "../../data/analysis_datasets/fran/maaslin2/final_results/cbcl/m24/chinese_subsample/int_raw_0.5p_results_compcases_chinesesubsamp",
+  min_abundance = 0,
+  min_prevalence = 0.005,
+  max_significance = 0.25, 
+  analysis_method = "lm", #default
+  fixed_effects = c("cbclintprobtot_m24_std", "STAI_prorated_state_pw26", "sex_binary_ch"),
+  standardize = TRUE 
+)
+```
+
+### Internalizing problems, 4 years
+```{r}
+#INTERNALIZING PROBLEMS
+#get complete cases metadata file
+int4_metadata_ch <- M24_metadata %>% 
+  filter(!is.na(cbclintprobtot_y4_std) & !is.na(STAI_prorated_state_pw26) & !is.na(sex_binary) & !is.na(only_bf_months) & !is.na(Sequencing_batch) & !is.na(mother_ethnicity) & !is.na(Fibre.per.1000kcal)) %>% dplyr::filter(mother_ethnicity=="chinese") #N=155
+write_tsv(int4_metadata_ch, "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_intY4_chinesesubsamp.tsv")
+int4_metadata_ch_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_intY4_chinesesubsamp.tsv" 
+
+#Internalzing problems - 0.5% filtering threshold
+maaslin_int4_0.5p = Maaslin2(
+  input_data = tax_features_ra_fp,
+  input_metadata = int4_metadata_ch_fp,
+  output = "../../data/analysis_datasets/fran/maaslin2/final_results/cbcl/y4/chinese_subsample/int_raw_0.5p_results_compcases_chinesesubsamp",
+  min_abundance = 0,
+  min_prevalence = 0.005,
+  max_significance = 0.25, 
+  analysis_method = "lm", #default
+  fixed_effects = c("STAI_prorated_state_pw26", "cbclintprobtot_y4_std", "sex_binary_ch", "only_bf_months", "Sequencing_batch", "Fibre.per.1000kcal"),
+  standardize = TRUE, 
+  reference = NULL
+)
+```
+
+### Sleep problems, 4 years
+```{r}
+#SLEEP PROBLEMS
+sleep4_metadata_ch <- M24_metadata %>% 
+  filter(!is.na(cbclattprobtot_y4_std) & !is.na(STAI_prorated_state_pw26) & !is.na(sex_binary) & !is.na(only_bf_months) & !is.na(mother_ethnicity) & !is.na(probiotics_M24) & !is.na(Sequencing_batch)) %>% dplyr::filter(mother_ethnicity=="chinese")
+#N=223
+write_tsv(sleep4_metadata_ch, "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_sleepY4_chinesesubsamp.tsv")
+sleep4_metadata_ch_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_sleepY4_chinesesubsamp.tsv" 
+
+#Sleep problems - 0.5% filtering threshold
+maaslin_sleep4_0.5p = Maaslin2(
+  input_data = tax_features_ra_fp,
+  input_metadata = sleep4_metadata_ch_fp,
+  output = "../../data/analysis_datasets/fran/maaslin2/final_results/cbcl/y4/chinese_subsample/sleep_raw_0.5p_results_compcases_chinesesubsamp",
+  min_abundance = 0,
+  min_prevalence = 0.005,
+  max_significance = 0.25, 
+  analysis_method = "lm", 
+  fixed_effects = c("STAI_prorated_state_pw26", "cbclsleepprobtot_y4_std", "sex_binary_ch", "only_bf_months",  "probiotics_M24", "Sequencing_batch"),
+  standardize = TRUE, 
+  reference = NULL
+)
+```
+
+### ADHD problems, age 4 years
+```{r}
+#ADHD PROBLEMS
+adhd4_metadata_ch <- M24_metadata %>% 
+  filter(!is.na(cbcladhdprobtot_y4_std) & !is.na(STAI_prorated_state_pw26) & !is.na(sex_binary) & !is.na(ctq_total_score_25it)) %>% dplyr::filter(mother_ethnicity=="chinese") #N=161
+write_tsv(adhd4_metadata_ch, "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_adhdY4_chinesesubsamp.tsv")
+adhd4_metadata_ch_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_adhdY4_chinesesubsamp.tsv" 
+
+#ADHD problems - 0.5% filtering threshold
+maaslin_adhd4_0.5p = Maaslin2(
+  input_data = tax_features_ra_fp,
+  input_metadata = adhd4_metadata_ch_fp,
+  output = "../../data/analysis_datasets/fran/maaslin2/final_results/cbcl/y4/chinese_subsample/adhd_raw_0.5p_results_compcases_chinesesub",
+  min_abundance = 0,
+  min_prevalence = 0.005,
+  max_significance = 0.25, 
+  analysis_method = "lm", 
+  fixed_effects = c("STAI_prorated_state_pw26", "ctq_total_score_25it", "cbcladhdprobtot_y4_std", "sex_binary_ch"),
+  standardize = TRUE 
+)
+```
+
+### Attention problems, age 4 years
+```{r}
+#ATTENTION PROBLEMS
+attn4_metadata_ch <- M24_metadata %>% 
+  filter(!is.na(cbclattprobtot_y4_std) & !is.na(STAI_prorated_state_pw26) & !is.na(sex_binary) & !is.na(ctq_total_score_25it)) %>% dplyr::filter(mother_ethnicity=="chinese")
+write_tsv(attn4_metadata_ch, "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_attnY4_chinesesubsamp.tsv")
+attn4_metadata_ch_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_attnY4_chinesesubsamp.tsv" 
+
+#Attention problems - 0.5% filtering threshold
+maaslin_att4_0.5p = Maaslin2(
+  input_data = tax_features_ra_fp,
+  input_metadata = attn4_metadata_ch_fp,
+  output = "../../data/analysis_datasets/fran/maaslin2/final_results/cbcl/y4/chinese_subsample/attn_raw_0.5p_results_compases_chinesesub",
+  min_abundance = 0,
+  min_prevalence = 0.005,
+  max_significance = 0.25, 
+  analysis_method = "lm", 
+  fixed_effects = c("STAI_prorated_state_pw26", "ctq_total_score_25it", "cbclattprobtot_y4_std", "sex_binary_ch"),
+  standardize = TRUE 
+)
+```
+
+### Developmental problems, age 4 years
+```{r}
+#DEVELOPMENTAL PROBLEMS
+dev4_metadata_ch <- M24_metadata %>% 
+  filter(!is.na(cbcldevprobtot_y4_std) & !is.na(STAI_prorated_state_pw26) & !is.na(sex_binary)) %>% dplyr::filter(mother_ethnicity=="chinese")
+write_tsv(dev4_metadata_ch, "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_devY4_chinesesubsamp.tsv")
+dev4_metadata_ch_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_devY4_chinesesubsamp.tsv" 
+
+#Developmental problems - 0.5% filtering threshold
+maaslin_dev4_0.5p = Maaslin2(
+  input_data = tax_features_ra_fp,
+  input_metadata = dev4_metadata_ch_fp,
+  output = "../../data/analysis_datasets/fran/maaslin2/final_results/cbcl/y4/chinese_subsample/dev_raw_0.5p_results_compases_chinesesub",
+  min_abundance = 0,
+  min_prevalence = 0.005,
+  max_significance = 0.25, 
+  analysis_method = "lm", #default
+  fixed_effects = c("STAI_prorated_state_pw26", "cbcldevprobtot_y4_std", "sex_binary_ch"),
+  standardize = TRUE 
+)
+```
+
+### Externalizing problems, age 4 years
+```{r}
+#EXTERNALIZING PROBLEMS
+ext4_metadata_ch <- M24_metadata %>% 
+  filter(!is.na(cbclattprobtot_y4_std) & !is.na(STAI_prorated_state_pw26) & !is.na(sex_binary) & !is.na(ctq_total_score_25it)) %>% dplyr::filter(mother_ethnicity=="chinese")
+write_tsv(ext4_metadata_ch, "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_extY4_chinesesubsamp.tsv")
+ext4_metadata_ch_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_extY4_chinesesubsamp.tsv" 
+
+#Externalizing - 0.5% filtering threshold
+maaslin_ext4_0.5p = Maaslin2(
+  input_data = tax_features_ra_fp,
+  input_metadata = ext4_metadata_ch_fp,
+  output = "../../data/analysis_datasets/fran/maaslin2/final_results/cbcl/y4/chinese_subsample/ext_raw_0.5p_results_compases_chinesesamp",
+  min_abundance = 0,
+  min_prevalence = 0.005,
+  max_significance = 0.25, 
+  analysis_method = "lm", #default
+  fixed_effects = c("STAI_prorated_state_pw26", "ctq_total_score_25it", "cbclextprobtot_y4_std", "sex_binary_ch"),
+  standardize = TRUE 
+)
+```
+
+### Total problems, age 4 years
+```{r}
+#TOTAL PROBLEMS
+tot4_metadata_ch <- M24_metadata %>% 
+  filter(!is.na(cbcltotprobtot_y4_std) & !is.na(STAI_prorated_state_pw26) & !is.na(sex_binary) ) %>% dplyr::filter(mother_ethnicity=="chinese")
+write_tsv(tot4_metadata_ch, "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_totY4_chinesesubsamp.tsv")
+tot4_metadata_ch_fp <- "../../data/analysis_datasets/fran/maaslin2/inputs/metadata/metadata_totY4_chinesesubsamp.tsv" 
+
+
+#Total problems - 0.5% filtering threshold
+maaslin_tot4_0.5p = Maaslin2(
+  input_data = tax_features_ra_fp,
+  input_metadata = tot4_metadata_ch_fp,
+  output = "../../data/analysis_datasets/fran/maaslin2/final_results/cbcl/y4/chinese_subsample/tot_raw_0.5p_results_compases_chinesesubsamp",
+  min_abundance = 0,
+  min_prevalence = 0.005,
+  max_significance = 0.25, 
+  analysis_method = "lm", 
+  fixed_effects = c("STAI_prorated_state_pw26", "ctq_total_score_25it", "cbcltotprobtot_y4_std", "sex_binary_ch"),
+  standardize = TRUE 
+)
+```
+

@@ -1,6 +1,8 @@
 # gusto_adversity_microbiome_SEF
 Data processing and analysis scripts used for the manuscript "Multigenerational adversity impacts on gut microbiome composition and socioemotional functioning in early childhood". 
 
+**Note:** Scripts with the extension "_PNASreviews" were created or updated during the review process. 
+
 Preprint at: https://psyarxiv.com/64m9g/, OSF project at: https://osf.io/c564x/. 
 
 These scripts are uploaded as .html files knitted from R markdown or Jupyter notebook (depending on coding language) so that code and output can be easily viewed together. However, the .html files cannot be visualized directly within GitHub. Please follow the instructions below to open and view them. 

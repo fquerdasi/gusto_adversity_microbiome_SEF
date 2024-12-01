@@ -1,0 +1,27 @@
+DATA:
+file = serial_mplus_v2.dat;
+VARIABlE:
+names = precon prenat income fiber pufa shannon faith feat even id postnat sex deliv seq;
+usevariables = precon prenat income fiber pufa shannon postnat sex deliv seq;
+!order those are listed in the dataset
+categorical = postnat;
+ANALYSIS:
+type=general;
+bootstrap=1000;
+MODEL:
+prenat on precon income;
+postnat on prenat precon sex deliv income seq fiber pufa;
+shannon on precon prenat postnat sex deliv income seq fiber pufa;
+MODEL INDIRECT:
+shannon ind postnat prenat precon;
+shannon ind postnat prenat;
+shannon ind postnat precon;
+shannon ind prenat precon; 
+postnat ind prenat precon;
+ANALYSIS: parameterization = theta;
+OUTPUT:
+stdyx cinterval(bootstrap); 
+
+
+
+    

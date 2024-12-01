@@ -15,9 +15,12 @@ These scripts are uploaded as .html files knitted from R markdown or Jupyter not
 5. Click to open in a web browser
 
 ## The following scripts are included in this repository: ##
-__Main analysis script:__ gusto_microbioM24_adversity_cbcl_sharingversion.html.  
+__Main Analysis Script:__ gusto_microbioM24_adversity_cbcl_sharingversion.html.  
+* __most up-to-date version (after reviews)__: gusto_microbioM24_adversity_cbcl_sharingversion_PNASreviews. Rmd. 
 
 __Serial Mediation Scripts (Mplus):__ .inp files inside serial_mediation_mplus_scripts folder 
+
+__Diet Sensitivity Analyses Script:__ gusto_diet_sensitivity_analyses_PNASreviews.Rmd
 
 __Metadata wrangling script:__ gusto_metadata_wrangle_sharingversion.html.   
 

@@ -3,7 +3,7 @@ Data processing and analysis scripts used for the manuscript "Multigenerational 
 
 **Note:** Scripts with the extension "_PNASreviews" were created or updated during the review process. 
 
-Preprint at: https://psyarxiv.com/64m9g/, OSF project at: https://osf.io/c564x/. 
+Paper at: https://www.pnas.org/doi/abs/10.1073/pnas.2213768120, Preprint at: https://psyarxiv.com/64m9g/, OSF project at: https://osf.io/c564x/. 
 
 These scripts are uploaded as .html files knitted from R markdown or Jupyter notebook (depending on coding language) so that code and output can be easily viewed together. However, the .html files cannot be visualized directly within GitHub. Please follow the instructions below to open and view them. 
 

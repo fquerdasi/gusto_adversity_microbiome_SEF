@@ -2,7 +2,7 @@
 title: "**Multigenerational adversity impacts on gut microbiome composition and socioemotional functioning in early childhood**: Main Analyses"
 subtitle: "Updated based on PNAS Reviewer Comments"
 author: "Fran Querdasi"
-date: "7/20/2022"
+date: "5/05/2023" #date finished working on it
 output: 
   html_document:
     toc: true
@@ -64,7 +64,7 @@ suppressPackageStartupMessages({
 ```
 
 ## Load data
-**Note:** Filepaths not shown
+**Note:** Filepaths will not be shown in knitted version
 ```{r load data, echo=FALSE}
 #general
 general_mb_path <- "../../data/microbiome/M24_M48/"
@@ -318,6 +318,7 @@ write_csv(alpha_diversity_stress_usable, "../../data/analysis_datasets/fran/alph
 write_csv(alpha_diversity_stress_usable, "../../manuscripts/fran_adversity_microbiome/Form_B_submission/data_updated/alpha_diversity_and_metadata_R1.csv")
 ```
 
+# Preliminary Exploration of Bivariate Relationships
 ## Check whether there are differences in selected socioemotional functioning domains by child sex, family income, and ethnicity 
 ### Socioemotional Functioning at Age 2 Years
 ```{r eval=FALSE}
@@ -425,7 +426,7 @@ t.test(PUFA_.~postnatal_stress, data=alpha_diversity_stress_usable, alternative=
 ```
 
 ## Check that Sequencing Batch is not associated with other variables of interest
-Test association between sequencing batch and adversity variables, and numbers in each batch
+Test association between sequencing batch and adversity variables, and numbers of each adversity group in each batch
 ```{r eval=FALSE}
 #t-test with sequencing batch and preconception, prenatal adversity
 t.test(ctq_total_score_25it~Sequencing_batch, data=alpha_diversity_stress_usable, alternative="two.sided", paired=FALSE) #ns
@@ -458,10 +459,10 @@ alpha_diversity_stress_usable %>%
   mutate(freq = round(cnt / sum(cnt), 3)) %>% 
   arrange(desc(freq)) #22% in batch 1 for each group
 ```
-Conclusion: adversity grouping variable prevalences do not differ by sequencing batch 
+Conclusion: adversity grouping variable prevalences do not differ by sequencing batch, and are not associated with sequencing batch 
 
 # Initial Data Visualizations
-## Barplots
+## Microbe Barplots
 ```{r taxa barplots, warning=FALSE}
 # get top 25 most abundant taxa
 physeq_ttaxa <- get_top_taxa(physeq_obj = physeq_M24,
@@ -502,7 +503,7 @@ fantaxtic_bar(tmp_ctq, color_by = "Species", label_by = "Species") +
   scale_fill_manual(values=as.vector(glasbey(32)))
 ```
 
-## Distributions
+## Variable Distributions
 ```{r variable distributions, warning=FALSE}
 # for LEQ, who was the respondent?
 alpha_diversity_stress_usable %>% 
@@ -1221,6 +1222,7 @@ ggplot(d_cumulative_long_complete, aes(y = value, x = cumulative_adv, colour = c
   stat_summary(fun=mean, colour='royalblue3', geom='point', shape='-', size=10) +
   scale_color_discrete("Cumulative Adversity Exposure", labels = c("0 timepoints", "1 timepoint", "2+ timepoints")) 
 ```
+
 ### Figure 1:  Faith’s PD is Lower Among Children with Higher Postnatal Adversity, Evenness is Higher Among Children with Higher Prenatal Adversity 
 ```{r faith by postnatal, warning=FALSE}
 
@@ -1245,6 +1247,7 @@ alpha_diversity_stress_usable <-
 #create residual for faith pd after removing variance associated with covariates
 faith_resid <- lm(faith_pd ~Fibre.per.1000kcal +sex_binary+deliv_mode+monthly_income_per_member+Sequencing_batch+ctq_total_score_25it+STAI_prorated_state_pw26, data = alpha_diversity_stress_usable)
 
+# create a dataset with only the participants you are including in the main analysis
 alpha_diversity_stress_usable_faith <- 
   alpha_diversity_stress_usable %>% 
   filter(!is.na(sex_binary) & !is.na(deliv_mode) &!is.na(monthly_income_per_member)&!is.na(Sequencing_batch) & !is.na(ctq_total_score_25it) & !is.na(STAI_prorated_state_pw26) & !is.na(Fibre.per.1000kcal)) %>% 
@@ -3811,7 +3814,7 @@ ggplot(data=maaslin_.5_results_figures %>% filter(str_detect(analysis, "preconce
 ggsave("../../manuscripts/fran_adversity_microbiome/figures/adversity_da_figure_r1.svg", height = 4, width = 7, bg = "white", dpi=1000)
 ```       
 
-### Figure 3: Differentially Abundant Taxa as a Function of Adversity-Correlated Child Socioemotional Functioning
+### Figure 3: Differentially Abundant Taxa as a Function of Adversity-Correlated Child Socioemotional Functioning Domains
 ```{r dotplot SEF, warning=FALSE}
 #create dotplot w taxa for SEF variables
 ggplot(data=maaslin_.5_results_figures %>% filter(str_detect(name, "cbcl")), aes(x = Taxa, y = log2FoldChange, color=factor(analysis))) +
@@ -4113,7 +4116,7 @@ t.test(STAI_prorated_state_pw26~postnatal_stress, data=alpha_diversity_stress_us
 ### What effect are the covariates having in associations where adding/removing covariates changes significance?
 If significant but then becomes n.s. when covariates included: potentially collinearity too high (decreases power when both entered in model)
 Analyses that differed with vs. without including covariates:
-- postnatal adversity & parabacteriodes (all adv in model; n.s. when covariates not included)
+- postnatal adversity & parabacteriodes (all adversities in model; n.s. when covariates not included)
 - postnatal adversity & parabacteriodes (separate model; n.s. when covariates not included)
 - postnatal adversity & finegoldia (separate model; n.s. when covariates not included)
 - prenatal adversity & streptococcus (separate model; n.s. when covariates not included)
@@ -4193,7 +4196,7 @@ t.test(cbclsleepprobtot_y4_std~probiotics_M24, data=alpha_diversity_stress_usabl
 ```
 
 ### Differential abundance analyses at family and genus level
-Here we will only test prenatal adversity (only adversity in model), developmental problems at Y2, and sleep problems at Y4 because we found taxa from the same family to be DA in those domains and these analyses are specifically to follow-up on those results. 
+Here we will only test prenatal adversity (only adversities in model), developmental problems at Y2, and sleep problems at Y4 because we found taxa from the same family to be differentially abundant in those domains and these analyses are specifically to follow-up on those results. 
 #### Format family-level data for maaslin2
 2. A tab-delimited feature file (taxonomy as columns, samples as rows)  
 ```{r}
